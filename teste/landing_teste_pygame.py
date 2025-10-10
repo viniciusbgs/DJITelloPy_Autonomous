@@ -7,8 +7,10 @@ from ultralytics import YOLO
 from cv2 import aruco
 import math  
 from simple_pid import PID
+from roboflow import Roboflow
 
-# model = YOLO("models/yolov8n.pt")
+
+model = YOLO("models/best.pt")
 
 markerSize = 15
 
@@ -18,10 +20,13 @@ parameters =  aruco.DetectorParameters()
 mtx = np.load('/Users/vinicius/GITHUB/DJITelloPy/teste/mtx.npy')
 dist = np.load('/Users/vinicius/GITHUB/DJITelloPy/teste/dist.npy')
 
-xoff = 0
-yoff = 0 
-zoff = 0
-roff = 0
+
+# # Inicializa Roboflow
+# rf = Roboflow(api_key="uHRCGjgYZmqYK3EZTxK7")  # API Key
+# project = rf.workspace("school-maiab").project("aruco-rzitt")
+# model_rf = project.version(2).model
+
+
 
 # Speed of the drone
 # 无人机的速度
@@ -186,8 +191,11 @@ class FrontEnd(object):
             self.screen.fill([0, 0, 0])
 
             frame = frame_read.frame
-            annotated_frame = frame
-            
+
+            # 1️⃣ Inferência usando Roboflow
+            results = model.predict(source=frame, conf=0.5, iou=0.5, device="mps")  # se quiser usar a GPU do Mac
+            annotated_frame = results[0].plot()
+
             # results = model.predict(frame, imgsz=320, device="mps")  # "mps" usa GPU do Mac M1/M2
             # annotated_frame = results[0].plot()
 
@@ -260,15 +268,15 @@ class FrontEnd(object):
                 self.yoff = int(540-targ_cord_y)
                 self.zoff = int(90-tvec[2]) 
                 self.roff = int(95-math.degrees(yaw_marker))
-                vTarget = np.array((xoff, yoff, zoff, roff))
+                vTarget = np.array((self.xoff, self.yoff, self.zoff, self.roff))
 
                 if self.manual_mode == False:
-                    self.yaw_velocity = int(-self.pid_yaw(xoff))
-                    self.up_down_velocity = int(-self.pid_throttle(yoff))
-                    self.for_back_velocity = int(self.pid_pitch(zoff))
-                    self.left_right_velocity = int(self.pid_roll(roff))
+                    self.yaw_velocity = int(-self.pid_yaw(self.xoff))
+                    self.up_down_velocity = int(-self.pid_throttle(self.yoff))
+                    self.for_back_velocity = int(self.pid_pitch(self.zoff))
+                    self.left_right_velocity = int(self.pid_roll(self.roff))
 
-                if -10<xoff<10 and -10<yoff<10 and -40<zoff<40 and roff<10:
+                if -10<self.xoff<10 and -10<self.yoff<10 and -40<self.zoff<40 and self.roff<10:
 
                     uzaklik = int((0.8883*tvec[2])-3.4264)
                     print(uzaklik)
@@ -400,7 +408,7 @@ class FrontEnd(object):
         elif key == pygame.K_a or key == pygame.K_d:  # set zero yaw velocity
             self.yaw_velocity = 0
         elif key == pygame.K_t:  # takeoff
-            self.tello.takeoff()
+            # self.tello.takeoff()
             self.send_rc_control = True
         elif key == pygame.K_l:  # land
             not self.tello.land()
