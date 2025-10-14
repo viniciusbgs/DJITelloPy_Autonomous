@@ -7,8 +7,6 @@ from ultralytics import YOLO
 from cv2 import aruco
 import math  
 from simple_pid import PID
-from roboflow import Roboflow
-
 
 model = YOLO("models/best.pt")
 
@@ -20,23 +18,12 @@ parameters =  aruco.DetectorParameters()
 mtx = np.load('/Users/vinicius/GITHUB/DJITelloPy/teste/mtx.npy')
 dist = np.load('/Users/vinicius/GITHUB/DJITelloPy/teste/dist.npy')
 
-
-# # Inicializa Roboflow
-# rf = Roboflow(api_key="uHRCGjgYZmqYK3EZTxK7")  # API Key
-# project = rf.workspace("school-maiab").project("aruco-rzitt")
-# model_rf = project.version(2).model
-
-
-
 # Speed of the drone
-# 无人机的速度
-S = 30
+S = 40
+
 # Frames per second of the pygame window display
 # A low number also results in input lag, as input information is processed once per frame.
-# pygame窗口显示的帧数
-# 较低的帧数会导致输入延迟，因为一帧只会处理一次输入信息
 FPS = 30
-
 
 def isRotationMatrix(R):
     Rt = np.transpose(R)
@@ -44,8 +31,6 @@ def isRotationMatrix(R):
     I = np.identity(3, dtype=R.dtype)
     n = np.linalg.norm(I - shouldBeIdentity)
     return n < 1e-6
-
-
 
 # Calculates rotation matrix to euler angles
 # The result is the same as MATLAB except the order
@@ -65,18 +50,13 @@ def rotationMatrixToEulerAngles(R):
         x = math.atan2(-R[1, 2], R[1, 1])
         y = math.atan2(-R[2, 0], sy)
         z = 0
-
     return np.array([x, y, z])
-
 
 #--- 180 deg rotation matrix around the x axis
 R_flip  = np.zeros((3,3), dtype=np.float32)
 R_flip[0,0] = 1.0
 R_flip[1,1] =-1.0
 R_flip[2,2] =-1.0
-
-
-
 
 class FrontEnd(object):
     """ Maintains the Tello display and moves it through the keyboard keys.
@@ -87,40 +67,25 @@ class FrontEnd(object):
             - Arrow keys: Forward, backward, left and right.
             - A and D: Counter clockwise and clockwise rotations (yaw)
             - W and S: Up and down.
-
-        保持Tello画面显示并用键盘移动它
-        按下ESC键退出
-        操作说明：
-            T：起飞
-            L：降落
-            方向键：前后左右
-            A和D：逆时针与顺时针转向
-            W和S：上升与下降
-
     """
 
     def __init__(self):
         # Init pygame
-        # 初始化pygame
         pygame.init()
 
         # Creat pygame window
-        # 创建pygame窗口
         pygame.display.set_caption("Tello video stream")
         self.screen = pygame.display.set_mode([960, 720])
 
         # Init Tello object that interacts with the Tello drone
-        # 初始化与Tello交互的Tello对象
         self.tello = Tello()
 
         # Drone velocities between -100~100
-        # 无人机各方向速度在-100~100之间
         self.for_back_velocity = 0
         self.left_right_velocity = 0
         self.up_down_velocity = 0
         self.yaw_velocity = 0
-        self.speed = 20
-
+        self.speed = 30
 
         # Drone offset
         self.xoff = 0
@@ -128,14 +93,21 @@ class FrontEnd(object):
         self.zoff = 0
         self.roff = 0
 
-
         self.manual_mode = True  # começa em manual
         self.send_rc_control = False
-        #teste
-        self.pid_yaw      = PID(0.20, 0.00005, 0.01,setpoint=0,output_limits=(-100,100)) 
-        self.pid_throttle = PID(0.25, 0.00001, 0.01,setpoint=0,output_limits=(-100,50)) 
-        self.pid_pitch    = PID(0.25, 0.0002, 0.01,setpoint=0,output_limits=(-20,20))
-        self.pid_roll     = PID(0.35, 0.00005, 0.01,setpoint=0,output_limits=(-70,70))
+
+        """
+        yaw: rotação (gira esquerda/direita)
+        throttle: altitude (sobe/desce)
+        pitch: movimento frontal (frente/trás)
+        roll: movimento lateral (esquerda/direita)
+        """
+
+        # Valores de teste
+        self.pid_yaw      = PID(0.20, 0, 0,setpoint=0,output_limits=(-70,70)) 
+        self.pid_throttle = PID(0.25, 0, 0,setpoint=0,output_limits=(-40,40)) 
+        self.pid_pitch    = PID(0.25, 0, 0,setpoint=0,output_limits=(-40,40))
+        self.pid_roll     = PID(0.20, 0, 0,setpoint=0,output_limits=(-40,40))
 
         # pygame helpers for stable overlays
         self.clock = pygame.time.Clock()
@@ -149,7 +121,6 @@ class FrontEnd(object):
         # self.pid_roll     = PID(0.35, 0.00005, 0.01,setpoint=0,output_limits=(-70,70))
 
         # create update timer
-        # 创建上传定时器
         pygame.time.set_timer(pygame.USEREVENT + 1, 1000 // FPS)
 
     def run(self):
@@ -157,13 +128,7 @@ class FrontEnd(object):
         self.tello.connect()
         self.tello.set_speed(self.speed)
 
-        # # Habilitar detecção de mission pads
-        # self.tello.enable_mission_pads()
-        # self.tello.set_mission_pad_detection_direction(0)  # 0 = all directions, 1 = forward only, 2 = downward only
-
-
         # In case streaming is on. This happens when we quit this program without the escape key.
-        # 防止视频流已开启。这会在不使用ESC键退出的情况下发生。
         self.tello.streamoff()
         self.tello.streamon()
 
@@ -192,20 +157,125 @@ class FrontEnd(object):
 
             frame = frame_read.frame
 
-            # 1️⃣ Inferência usando Roboflow
-            results = model.predict(source=frame, conf=0.5, iou=0.5, device="mps")  # se quiser usar a GPU do Mac
-            annotated_frame = results[0].plot()
-
-            # results = model.predict(frame, imgsz=320, device="mps")  # "mps" usa GPU do Mac M1/M2
+            # Deteccao de Aruco:
+            # Inferência usando YOLO
+            # results = model.predict(source=frame, conf=0.5, iou=0.5, device="mps", imgsz=640, verbose=False)  # se quiser usar a GPU do Mac
+            annotated_frame = frame
             # annotated_frame = results[0].plot()
-
-
+            
+            # Deteccao usando OpenCV
             detector = aruco.ArucoDetector(aruco_dict, parameters)
             corners, ids, rejectedImgPoints = detector.detectMarkers(annotated_frame)
 
+            # Prioridade: YOLO > Opencv
+            # Se Yolo nao detectar, o OpenCV é chamado
+            # --- YOLO detections ---
+            # boxes = results[0].boxes
+            # if boxes is not None and len(boxes) > 0:
+            #     for box in boxes:
+            #         cls = int(box.cls)
+            #         conf = float(box.conf)
+            #         x1, y1, x2, y2 = map(int, box.xyxy[0])
+            #         label = model.names[cls]
 
+            #         # Coordenadas do centro da caixa
+            #         cx = int((x1 + x2) / 2)
+            #         cy = int((y1 + y2) / 2)
+
+            #         # Desenhar o centro (círculo verde)
+            #         cv2.circle(annotated_frame, (cx, cy), 5, (0, 255, 0), -1)
+                    
+            #         # 1. Defina os pontos 3D (coordenadas do marcador)
+            #         half_size = markerSize / 2
+            #         obj_points = np.array([
+            #             [-half_size, half_size, 0],   # Top-Left (ajuste se a sua ordem for diferente)
+            #             [ half_size, half_size, 0],   # Top-Right
+            #             [ half_size, -half_size, 0],  # Bottom-Right
+            #             [-half_size, -half_size, 0]   # Bottom-Left
+            #         ], dtype=np.float32)
+
+            #         # 2. Pontos 2D (cantos da caixa do YOLO na imagem)
+            #         image_points = np.array([
+            #             [x1, y1],  # topo esquerdo
+            #             [x2, y1],  # topo direito
+            #             [x2, y2],  # baixo direito
+            #             [x1, y2]   # baixo esquerdo
+            #         ], dtype=np.float32)
+
+            #         # 3. Estimar pose com solvePnP
+            #         success, rvec, tvec = cv2.solvePnP(obj_points, image_points, mtx, dist, flags=cv2.SOLVEPNP_IPPE_SQUARE)
+
+            #         if success:
+
+            #             # 4. Formate rvec e tvec
+            #             rvec = rvec.flatten()
+            #             tvec = tvec.flatten()
+
+            #             aruco.drawDetectedMarkers(annotated_frame, corners, ids)
+            #             cv2.drawFrameAxes(annotated_frame, mtx, dist, rvec, tvec, 10)
+            #             # prepare marker and camera overlay strings (store for pygame overlay)
+            #             # marker_pos_str = "MARKER Position x=%4.0f y=%4.0f z=%4.0f" % (tvec.tolist()[0], tvec.tolist()[1], tvec.tolist()[2])
+                        
+            #             # Cria os textos separados para cada eixo com a cor correspondente
+            #             marker_x_str = f"X (vermelho): {tvec[0]:.0f}"
+            #             marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
+            #             marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
+
+            #             R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
+            #             R_tc = R_ct.T
+            #             roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
+            #             marker_att_str = "MARKER Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
+            #                 math.degrees(roll_marker), math.degrees(pitch_marker), math.degrees(yaw_marker)
+            #             )
+
+            #             pos_camera = -R_tc * np.matrix(tvec).T
+            #             camera_pos_str = "CAMERA Position x=%4.0f  y=%4.0f  z=%4.0f" % (
+            #                 pos_camera[0].item(), pos_camera[1].item(), pos_camera[2].item()
+            #             )
+
+            #             roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip * R_tc)
+            #             camera_att_str = "CAMERA Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
+            #                 math.degrees(roll_camera), math.degrees(pitch_camera), math.degrees(yaw_camera)
+            #             )
+
+            #             targ_cord_x = cx
+            #             targ_cord_y = cy
+
+            #             # Corrige/salva o erro/distancia do valor esperado para o valor real (circulo)
+            #             self.xoff = int(480-targ_cord_x)
+            #             self.yoff = int(540-targ_cord_y)
+            #             self.zoff = int(90-tvec[2]) 
+            #             self.roff = int(95-math.degrees(yaw_marker))
+            #             vTarget = np.array((self.xoff, self.yoff, self.zoff, self.roff))
+
+            #             if self.manual_mode == False:
+            #                 self.yaw_velocity = int(self.pid_yaw(self.xoff))
+            #                 self.up_down_velocity = int(-self.pid_throttle(self.yoff))
+            #                 self.for_back_velocity = int(self.pid_pitch(self.zoff))
+            #                 self.left_right_velocity = int(-self.pid_roll(self.roff))
+
+            #             if -10<self.xoff<10 and -10<self.yoff<10 and -40<self.zoff<40 and self.roff<10:
+
+            #                 uzaklik = int((0.8883*tvec[2])-3.4264)
+            #                 print(uzaklik)
+            #                 self.tello.move_forward(uzaklik)
+            #                 inis = True
+            #                 say = 1
+            #                 starttime = time.time()
+            #                 self.send_rc_control = False
+
+            #             # Salva na lista de overlay_texts para desenhar depois
+            #             self.overlay_texts = [
+            #                 marker_x_str,
+            #                 marker_y_str,
+            #                 marker_z_str,
+            #                 marker_att_str,  
+            #                 camera_pos_str,
+            #                 camera_att_str
+            #             ]       
+
+            # elif np.all(ids != None):
             if np.all(ids != None):
-
                 corner = corners[0][0]
                 m = int((corner[0][0]+corner[1][0]+corner[2][0]+corner[3][0])/4)
                 n = int((corner[0][1]+corner[1][1]+corner[2][1]+corner[3][1])/4)
@@ -219,7 +289,6 @@ class FrontEnd(object):
                 cv2.circle(annotated_frame, (int(corner[2][0]), int(corner[2][1])), 5, (255, 0, 0), -1) # Azul (3)
                 # Desenha o canto 4 (Inferior Esquerdo - deve corresponder a [-half_size, -half_size, 0])
                 cv2.circle(annotated_frame, (int(corner[3][0]), int(corner[3][1])), 5, (0, 255, 255), -1) # Amarelo (4)
-
 
                 # 1. Defina os pontos 3D (coordenadas do marcador)
                 half_size = markerSize / 2
@@ -241,7 +310,12 @@ class FrontEnd(object):
                 aruco.drawDetectedMarkers(annotated_frame, corners, ids)
                 cv2.drawFrameAxes(annotated_frame, mtx, dist, rvec, tvec, 10)
                 # prepare marker and camera overlay strings (store for pygame overlay)
-                marker_pos_str = "MARKER Position x=%4.0f  y=%4.0f  z=%4.0f" % (tvec[0], tvec[1], tvec[2])
+                # marker_pos_str = "MARKER Position x=%4.0f y=%4.0f z=%4.0f" % (tvec.tolist()[0], tvec.tolist()[1], tvec.tolist()[2])
+
+                # Cria os textos separados para cada eixo com a cor correspondente
+                marker_x_str = f"X (vermelho): {tvec[0]:.0f}"
+                marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
+                marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
 
                 R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
                 R_tc = R_ct.T
@@ -263,18 +337,33 @@ class FrontEnd(object):
                 targ_cord_x = m
                 targ_cord_y = n
 
-                # Corrige/salva o erro/distancia do valor esperado para o valor real (circulo)
+                # Original
                 self.xoff = int(targ_cord_x - 480)
                 self.yoff = int(540-targ_cord_y)
                 self.zoff = int(90-tvec[2]) 
                 self.roff = int(95-math.degrees(yaw_marker))
-                vTarget = np.array((self.xoff, self.yoff, self.zoff, self.roff))
+                vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
 
                 if self.manual_mode == False:
                     self.yaw_velocity = int(-self.pid_yaw(self.xoff))
                     self.up_down_velocity = int(-self.pid_throttle(self.yoff))
                     self.for_back_velocity = int(self.pid_pitch(self.zoff))
                     self.left_right_velocity = int(self.pid_roll(self.roff))
+                
+
+
+                # # Corrige/salva o erro/distancia do valor esperado para o valor real (circulo)
+                # self.xoff = int(480-targ_cord_x)
+                # self.yoff = int(540-targ_cord_y)
+                # self.zoff = int(90-tvec[2]) 
+                # self.roff = int(95-math.degrees(yaw_marker))
+                # vTarget = np.array((self.xoff, self.yoff, self.zoff, self.roff))
+
+                # if self.manual_mode == False:
+                #     self.yaw_velocity = int(self.pid_yaw(self.xoff))
+                #     self.up_down_velocity = int(self.pid_throttle(self.yoff))
+                #     self.for_back_velocity = int(self.pid_pitch(self.zoff))
+                #     self.left_right_velocity = int(-self.pid_roll(self.roff))
 
                 if -10<self.xoff<10 and -10<self.yoff<10 and -40<self.zoff<40 and self.roff<10:
 
@@ -284,11 +373,18 @@ class FrontEnd(object):
                     inis = True
                     say = 1
                     starttime = time.time()
+                    self.tello.land()
                     self.send_rc_control = False
 
-                # store overlay texts for pygame drawing
-                self.overlay_texts = [marker_pos_str, marker_att_str, camera_pos_str, camera_att_str]
-
+                # Salva na lista de overlay_texts para desenhar depois
+                self.overlay_texts = [
+                    marker_x_str,
+                    marker_y_str,
+                    marker_z_str,
+                    marker_att_str,  
+                    camera_pos_str,
+                    camera_att_str
+                ]    
 
             else:
                 # Nenhum marcador detectado, zera os offsets
@@ -299,14 +395,11 @@ class FrontEnd(object):
                     self.roff = 0
                 # clear overlay texts when no marker
                 self.overlay_texts = []
+                annotated_frame = frame 
 
-            # Convert BGR->RGB before creating pygame surface
-            # try:
-            #     frame_rgb = cv2.cvtColor(annotated_frame, cv2.COLOR_BGR2RGB)
-            # except Exception:
-            #     # if annotated_frame is already RGB or conversion fails, fall back
-            #     frame_rgb = annotated_frame
-            
+            cv2.line(annotated_frame, (480, 0), (480, 1080), (255, 0, 0), 2)  # linha vertical do centro
+            cv2.line(annotated_frame, (0, 540), (960, 540), (255, 0, 0), 2)   # linha horizontal do centro
+
             frame_rgb = annotated_frame
             frame_rgb = np.rot90(frame_rgb)
             frame_rgb = np.flipud(frame_rgb)
@@ -327,9 +420,11 @@ class FrontEnd(object):
 
             # Marker / camera overlay lines (top-left)
             y0 = 5
+            colors = [(255,0,0), (0,255,0), (0,0,255), (0,255,0), (0,255,0), (0,255,0)]  # cores para cada linha
             for i, line in enumerate(self.overlay_texts):
-                surf = self.font.render(line, True, (0, 255, 0))
+                surf = self.font.render(line, True, colors[i])
                 self.screen.blit(surf, (5, y0 + i * 20))
+
 
             # Draw center target circle on pygame (matching original coords)
             pygame.draw.circle(self.screen, (255, 0, 0), (480, 540), 10, 2)
@@ -338,25 +433,7 @@ class FrontEnd(object):
             pygame.display.flip()
             self.clock.tick(FPS)
 
-            # if pad_id == 8:  # inteiro
-            #     print("Mission Pad detectado:", pad_id)
-            #     self.tello.send_rc_control(0,0,0,0)
-            #     time.sleep(2)
-            #     try:
-            #         self.send_rc_control = False
-            #         self.tello.go_xyz_speed_mid(0, 0, 30, 10, pad_id)
-            #         # Ajustar altura se necessário (altura mínima para pouso ~20 cm)
-            #         altura = self.tello.get_height()
-            #         print("altura = ", altura)
-
-            #         self.tello.land()
-            #         print("pls land")
-            #         should_stop = True
-            #     except Exception as e:
-            #             print("Erro ao mover/pousar:", e)
-
         # Call it always before finishing. To deallocate resources.
-        # 通常在结束前调用它以释放资源
         self.tello.end()
         cv2.destroyAllWindows()
 
@@ -364,10 +441,6 @@ class FrontEnd(object):
         """ Update velocities based on key pressed
         Arguments:
             key: pygame key
-
-        基于键的按下上传各个方向的速度
-        参数：
-            key：pygame事件循环中的键事件
         """
         if key == pygame.K_UP:  # set forward velocity
             self.for_back_velocity = S
@@ -385,7 +458,6 @@ class FrontEnd(object):
             self.yaw_velocity = -S
         elif key == pygame.K_d:  # set yaw clockwise velocity
             self.yaw_velocity = S
-
         elif key == pygame.K_SPACE:  # alterna entre manual e automático com segurança
             self.toggle_mode()
 
@@ -394,10 +466,6 @@ class FrontEnd(object):
         """ Update velocities based on key released
         Arguments:
             key: pygame key
-
-        基于键的松开上传各个方向的速度
-        参数：
-            key：pygame事件循环中的键事件
         """
         if key == pygame.K_UP or key == pygame.K_DOWN:  # set zero forward/backward velocity
             self.for_back_velocity = 0
@@ -408,12 +476,11 @@ class FrontEnd(object):
         elif key == pygame.K_a or key == pygame.K_d:  # set zero yaw velocity
             self.yaw_velocity = 0
         elif key == pygame.K_t:  # takeoff
-            # self.tello.takeoff()
+            self.tello.takeoff()
             self.send_rc_control = True
         elif key == pygame.K_l:  # land
             not self.tello.land()
             self.send_rc_control = False
-
 
     def toggle_mode(self):
         """Toggle between manual and AUTONOMOUS with safety checks.
@@ -460,29 +527,51 @@ class FrontEnd(object):
                         pass
 
     def update(self):
-        """ Update routine. Send velocities to Tello.
-
-            向Tello发送各方向速度信息
-        """
+        
+        # Update routine. Send velocities to Tello.
         if self.send_rc_control:
                 
-                self.tello.send_rc_control(
-                    self.left_right_velocity,
-                    self.for_back_velocity,
-                    self.up_down_velocity,
-                    self.yaw_velocity
-                )
+            self.tello.send_rc_control(
+                self.left_right_velocity,
+                self.for_back_velocity,
+                self.up_down_velocity,
+                self.yaw_velocity
+            )
+
+            
+            # Texto descritivo da direção do movimento
+            direcoes = []
+
+            if self.for_back_velocity > 0:
+                direcoes.append(f"indo para FRENTE ({self.for_back_velocity})")
+            elif self.for_back_velocity < 0:
+                direcoes.append(f"indo para TRÁS ({self.for_back_velocity})")
+
+            if self.left_right_velocity > 0:
+                direcoes.append(f"indo para DIREITA ({self.left_right_velocity})")
+            elif self.left_right_velocity < 0:
+                direcoes.append(f"indo para ESQUERDA ({self.left_right_velocity})")
+
+            if self.up_down_velocity > 0:
+                direcoes.append(f"SUBINDO ({self.up_down_velocity})")
+            elif self.up_down_velocity < 0:
+                direcoes.append(f"DESCENDO ({self.up_down_velocity})")
+
+            if self.yaw_velocity > 0:
+                direcoes.append(f"ROTACIONANDO para a DIREITA ({self.yaw_velocity})")
+            elif self.yaw_velocity < 0:
+                direcoes.append(f"ROTACIONANDO para a ESQUERDA ({self.yaw_velocity})")
+
+            if not direcoes:
+                direcoes.append("PARADO")
+
+            print("O drone está " + ", ".join(direcoes))
 
 def main():
     frontend = FrontEnd()
 
     # run frontend
-
     frontend.run()
-
 
 if __name__ == '__main__':
     main()
-
-
-
