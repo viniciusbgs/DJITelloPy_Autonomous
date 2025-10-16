@@ -369,7 +369,7 @@ class FrontEnd(object):
 
                     uzaklik = int((0.8883*tvec[2])-3.4264)
                     print(uzaklik)
-                    self.tello.move_forward(uzaklik)
+                    self.tello.move_forward(uzaklik+18)
                     inis = True
                     say = 1
                     starttime = time.time()
