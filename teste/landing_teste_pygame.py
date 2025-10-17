@@ -19,7 +19,7 @@ mtx = np.load('/Users/vinicius/GITHUB/DJITelloPy/teste/mtx.npy')
 dist = np.load('/Users/vinicius/GITHUB/DJITelloPy/teste/dist.npy')
 
 # Speed of the drone
-S = 40
+S = 30
 
 # Frames per second of the pygame window display
 # A low number also results in input lag, as input information is processed once per frame.
@@ -159,9 +159,9 @@ class FrontEnd(object):
 
             # Deteccao de Aruco:
             # Inferência usando YOLO
-            # results = model.predict(source=frame, conf=0.5, iou=0.5, device="mps", imgsz=640, verbose=False)  # se quiser usar a GPU do Mac
-            annotated_frame = frame
-            # annotated_frame = results[0].plot()
+            results = model.predict(source=frame, conf=0.6, iou=0.5, device="mps", imgsz=640, verbose=False)  # se quiser usar a GPU do Mac
+            # annotated_frame = frame
+            annotated_frame = results[0].plot()
             
             # Deteccao usando OpenCV
             detector = aruco.ArucoDetector(aruco_dict, parameters)
@@ -170,221 +170,223 @@ class FrontEnd(object):
             # Prioridade: YOLO > Opencv
             # Se Yolo nao detectar, o OpenCV é chamado
             # --- YOLO detections ---
-            # boxes = results[0].boxes
-            # if boxes is not None and len(boxes) > 0:
-            #     for box in boxes:
-            #         cls = int(box.cls)
-            #         conf = float(box.conf)
-            #         x1, y1, x2, y2 = map(int, box.xyxy[0])
-            #         label = model.names[cls]
+            boxes = results[0].boxes
+            if boxes is not None and len(boxes) > 0:
+                for box in boxes:
+                    cls = int(box.cls)
+                    conf = float(box.conf)
+                    x1, y1, x2, y2 = map(int, box.xyxy[0])
+                    label = model.names[cls]
 
-            #         # Coordenadas do centro da caixa
-            #         cx = int((x1 + x2) / 2)
-            #         cy = int((y1 + y2) / 2)
+                    # Coordenadas do centro da caixa
+                    cx = int((x1 + x2) / 2)
+                    cy = int((y1 + y2) / 2)
 
-            #         # Desenhar o centro (círculo verde)
-            #         cv2.circle(annotated_frame, (cx, cy), 5, (0, 255, 0), -1)
+                    # Desenhar o centro (círculo verde)
+                    cv2.circle(annotated_frame, (cx, cy), 5, (0, 255, 0), -1)
                     
-            #         # 1. Defina os pontos 3D (coordenadas do marcador)
-            #         half_size = markerSize / 2
-            #         obj_points = np.array([
-            #             [-half_size, half_size, 0],   # Top-Left (ajuste se a sua ordem for diferente)
-            #             [ half_size, half_size, 0],   # Top-Right
-            #             [ half_size, -half_size, 0],  # Bottom-Right
-            #             [-half_size, -half_size, 0]   # Bottom-Left
-            #         ], dtype=np.float32)
+                    # 1. Defina os pontos 3D (coordenadas do marcador)
+                    half_size = markerSize / 2
+                    obj_points = np.array([
+                        [-half_size, half_size, 0],   # Top-Left (ajuste se a sua ordem for diferente)
+                        [ half_size, half_size, 0],   # Top-Right
+                        [ half_size, -half_size, 0],  # Bottom-Right
+                        [-half_size, -half_size, 0]   # Bottom-Left
+                    ], dtype=np.float32)
 
-            #         # 2. Pontos 2D (cantos da caixa do YOLO na imagem)
-            #         image_points = np.array([
-            #             [x1, y1],  # topo esquerdo
-            #             [x2, y1],  # topo direito
-            #             [x2, y2],  # baixo direito
-            #             [x1, y2]   # baixo esquerdo
-            #         ], dtype=np.float32)
+                    # 2. Pontos 2D (cantos da caixa do YOLO na imagem)
+                    image_points = np.array([
+                        [x1, y1],  # topo esquerdo
+                        [x2, y1],  # topo direito
+                        [x2, y2],  # baixo direito
+                        [x1, y2]   # baixo esquerdo
+                    ], dtype=np.float32)
 
-            #         # 3. Estimar pose com solvePnP
-            #         success, rvec, tvec = cv2.solvePnP(obj_points, image_points, mtx, dist, flags=cv2.SOLVEPNP_IPPE_SQUARE)
+                    # 3. Estimar pose com solvePnP
+                    success, rvec, tvec = cv2.solvePnP(obj_points, image_points, mtx, dist, flags=cv2.SOLVEPNP_IPPE_SQUARE)
 
-            #         if success:
+                    if success:
 
-            #             # 4. Formate rvec e tvec
-            #             rvec = rvec.flatten()
-            #             tvec = tvec.flatten()
+                        # 4. Formate rvec e tvec
+                        rvec = rvec.flatten()
+                        tvec = tvec.flatten()
 
-            #             aruco.drawDetectedMarkers(annotated_frame, corners, ids)
-            #             cv2.drawFrameAxes(annotated_frame, mtx, dist, rvec, tvec, 10)
-            #             # prepare marker and camera overlay strings (store for pygame overlay)
-            #             # marker_pos_str = "MARKER Position x=%4.0f y=%4.0f z=%4.0f" % (tvec.tolist()[0], tvec.tolist()[1], tvec.tolist()[2])
+                        aruco.drawDetectedMarkers(annotated_frame, corners, ids)
+                        cv2.drawFrameAxes(annotated_frame, mtx, dist, rvec, tvec, 10)
+                        # prepare marker and camera overlay strings (store for pygame overlay)
+                        # marker_pos_str = "MARKER Position x=%4.0f y=%4.0f z=%4.0f" % (tvec.tolist()[0], tvec.tolist()[1], tvec.tolist()[2])
                         
-            #             # Cria os textos separados para cada eixo com a cor correspondente
-            #             marker_x_str = f"X (vermelho): {tvec[0]:.0f}"
-            #             marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
-            #             marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
+                        # Cria os textos separados para cada eixo com a cor correspondente
+                        marker_x_str = f"X (vermelho): {tvec[0]:.0f}"
+                        marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
+                        marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
 
-            #             R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
-            #             R_tc = R_ct.T
-            #             roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
-            #             marker_att_str = "MARKER Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
-            #                 math.degrees(roll_marker), math.degrees(pitch_marker), math.degrees(yaw_marker)
-            #             )
+                        R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
+                        R_tc = R_ct.T
+                        roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
+                        marker_att_str = "MARKER Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
+                            math.degrees(roll_marker), math.degrees(pitch_marker), math.degrees(yaw_marker)
+                        )
 
-            #             pos_camera = -R_tc * np.matrix(tvec).T
-            #             camera_pos_str = "CAMERA Position x=%4.0f  y=%4.0f  z=%4.0f" % (
-            #                 pos_camera[0].item(), pos_camera[1].item(), pos_camera[2].item()
-            #             )
+                        pos_camera = -R_tc * np.matrix(tvec).T
+                        camera_pos_str = "CAMERA Position x=%4.0f  y=%4.0f  z=%4.0f" % (
+                            pos_camera[0].item(), pos_camera[1].item(), pos_camera[2].item()
+                        )
 
-            #             roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip * R_tc)
-            #             camera_att_str = "CAMERA Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
-            #                 math.degrees(roll_camera), math.degrees(pitch_camera), math.degrees(yaw_camera)
-            #             )
+                        roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip * R_tc)
+                        camera_att_str = "CAMERA Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
+                            math.degrees(roll_camera), math.degrees(pitch_camera), math.degrees(yaw_camera)
+                        )
 
-            #             targ_cord_x = cx
-            #             targ_cord_y = cy
+                        targ_cord_x = cx
+                        targ_cord_y = cy
 
-            #             # Corrige/salva o erro/distancia do valor esperado para o valor real (circulo)
-            #             self.xoff = int(480-targ_cord_x)
-            #             self.yoff = int(540-targ_cord_y)
-            #             self.zoff = int(90-tvec[2]) 
-            #             self.roff = int(95-math.degrees(yaw_marker))
-            #             vTarget = np.array((self.xoff, self.yoff, self.zoff, self.roff))
+                        # Original
+                        self.xoff = int(targ_cord_x - 480)
+                        self.yoff = int(540-targ_cord_y)
+                        self.zoff = int(60-tvec[2]) 
+                        self.roff = int(95-math.degrees(yaw_marker))
+                        vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
 
-            #             if self.manual_mode == False:
-            #                 self.yaw_velocity = int(self.pid_yaw(self.xoff))
-            #                 self.up_down_velocity = int(-self.pid_throttle(self.yoff))
-            #                 self.for_back_velocity = int(self.pid_pitch(self.zoff))
-            #                 self.left_right_velocity = int(-self.pid_roll(self.roff))
+                        # --- Mostrar offsets diretamente no frame ---
+                        cv2.putText(annotated_frame, f"xoff: {self.xoff}", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        cv2.putText(annotated_frame, f"yoff: {self.yoff}", (30, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        cv2.putText(annotated_frame, f"zoff: {self.zoff}", (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                        cv2.putText(annotated_frame, f"roff: {self.roff}", (30, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
-            #             if -10<self.xoff<10 and -10<self.yoff<10 and -40<self.zoff<40 and self.roff<10:
 
-            #                 uzaklik = int((0.8883*tvec[2])-3.4264)
-            #                 print(uzaklik)
-            #                 self.tello.move_forward(uzaklik)
-            #                 inis = True
-            #                 say = 1
-            #                 starttime = time.time()
-            #                 self.send_rc_control = False
+                        if self.manual_mode == False:
+                            self.yaw_velocity = int(-self.pid_yaw(self.xoff))
+                            self.up_down_velocity = int(-self.pid_throttle(self.yoff))
+                            self.for_back_velocity = int(self.pid_pitch(self.zoff))
+                            self.left_right_velocity = int(self.pid_roll(self.roff))
 
-            #             # Salva na lista de overlay_texts para desenhar depois
-            #             self.overlay_texts = [
-            #                 marker_x_str,
-            #                 marker_y_str,
-            #                 marker_z_str,
-            #                 marker_att_str,  
-            #                 camera_pos_str,
-            #                 camera_att_str
-            #             ]       
+                        if -15<self.xoff<15 and -15<self.yoff<15 and -90<self.zoff<90 and self.roff<10 and self.manual_mode == False:
 
-            # elif np.all(ids != None):
-            if np.all(ids != None):
-                corner = corners[0][0]
-                m = int((corner[0][0]+corner[1][0]+corner[2][0]+corner[3][0])/4)
-                n = int((corner[0][1]+corner[1][1]+corner[2][1]+corner[3][1])/4)
-                orta = int((corner[0][0]+corner[3][0])/2)
+                            uzaklik = int((0.8883*tvec[2])-3.4264)
+                            print(uzaklik)
+                            self.tello.move_forward(uzaklik)
+                            inis = True
+                            say = 1
+                            starttime = time.time()
+                            self.tello.land()
+                            self.send_rc_control = False
 
-                # Desenha o canto 1 (Superior Esquerdo - deve corresponder a [-half_size, half_size, 0])
-                cv2.circle(annotated_frame, (int(corner[0][0]), int(corner[0][1])), 5, (0, 0, 255), -1) # Vermelho (1)
-                # Desenha o canto 2 (Superior Direito - deve corresponder a [half_size, half_size, 0])
-                cv2.circle(annotated_frame, (int(corner[1][0]), int(corner[1][1])), 5, (0, 255, 0), -1) # Verde (2)
-                # Desenha o canto 3 (Inferior Direito - deve corresponder a [half_size, -half_size, 0])
-                cv2.circle(annotated_frame, (int(corner[2][0]), int(corner[2][1])), 5, (255, 0, 0), -1) # Azul (3)
-                # Desenha o canto 4 (Inferior Esquerdo - deve corresponder a [-half_size, -half_size, 0])
-                cv2.circle(annotated_frame, (int(corner[3][0]), int(corner[3][1])), 5, (0, 255, 255), -1) # Amarelo (4)
+                        # Salva na lista de overlay_texts para desenhar depois
+                        self.overlay_texts = [
+                            marker_x_str,
+                            marker_y_str,
+                            marker_z_str,
+                            marker_att_str,  
+                            camera_pos_str,
+                            camera_att_str
+                        ]        
 
-                # 1. Defina os pontos 3D (coordenadas do marcador)
-                half_size = markerSize / 2
-                obj_points = np.array([
-                    [-half_size, half_size, 0],   # Top-Left (ajuste se a sua ordem for diferente)
-                    [ half_size, half_size, 0],   # Top-Right
-                    [ half_size, -half_size, 0],  # Bottom-Right
-                    [-half_size, -half_size, 0]   # Bottom-Left
-                ], dtype=np.float32)
+            # elif ids is not None:
+            # # if np.all(ids != None):
+            #     corner = corners[0][0]
+            #     m = int((corner[0][0]+corner[1][0]+corner[2][0]+corner[3][0])/4)
+            #     n = int((corner[0][1]+corner[1][1]+corner[2][1]+corner[3][1])/4)
+            #     orta = int((corner[0][0]+corner[3][0])/2)
 
-                # 2. Use solvePnP (apenas para o primeiro marcador, 'corners[0]')
-                image_points = corner.astype(np.float32)
-                ret, rvec, tvec = cv2.solvePnP(obj_points, image_points, mtx, dist, flags=cv2.SOLVEPNP_IPPE_SQUARE)
+            #     # Desenha o canto 1 (Superior Esquerdo - deve corresponder a [-half_size, half_size, 0])
+            #     cv2.circle(annotated_frame, (int(corner[0][0]), int(corner[0][1])), 5, (0, 0, 255), -1) # Vermelho (1)
+            #     # Desenha o canto 2 (Superior Direito - deve corresponder a [half_size, half_size, 0])
+            #     cv2.circle(annotated_frame, (int(corner[1][0]), int(corner[1][1])), 5, (0, 255, 0), -1) # Verde (2)
+            #     # Desenha o canto 3 (Inferior Direito - deve corresponder a [half_size, -half_size, 0])
+            #     cv2.circle(annotated_frame, (int(corner[2][0]), int(corner[2][1])), 5, (255, 0, 0), -1) # Azul (3)
+            #     # Desenha o canto 4 (Inferior Esquerdo - deve corresponder a [-half_size, -half_size, 0])
+            #     cv2.circle(annotated_frame, (int(corner[3][0]), int(corner[3][1])), 5, (0, 255, 255), -1) # Amarelo (4)
+
+            #     # 1. Defina os pontos 3D (coordenadas do marcador)
+            #     half_size = markerSize / 2
+            #     obj_points = np.array([
+            #         [-half_size, half_size, 0],   # Top-Left (ajuste se a sua ordem for diferente)
+            #         [ half_size, half_size, 0],   # Top-Right
+            #         [ half_size, -half_size, 0],  # Bottom-Right
+            #         [-half_size, -half_size, 0]   # Bottom-Left
+            #     ], dtype=np.float32)
+
+            #     # 2. Use solvePnP (apenas para o primeiro marcador, 'corners[0]')
+            #     image_points = corner.astype(np.float32)
+            #     ret, rvec, tvec = cv2.solvePnP(obj_points, image_points, mtx, dist, flags=cv2.SOLVEPNP_IPPE_SQUARE)
                 
-                # 3. Formate rvec e tvec
-                rvec = rvec.flatten()
-                tvec = tvec.flatten()
+            #     # 3. Formate rvec e tvec
+            #     rvec = rvec.flatten()
+            #     tvec = tvec.flatten()
 
-                aruco.drawDetectedMarkers(annotated_frame, corners, ids)
-                cv2.drawFrameAxes(annotated_frame, mtx, dist, rvec, tvec, 10)
-                # prepare marker and camera overlay strings (store for pygame overlay)
-                # marker_pos_str = "MARKER Position x=%4.0f y=%4.0f z=%4.0f" % (tvec.tolist()[0], tvec.tolist()[1], tvec.tolist()[2])
+            #     aruco.drawDetectedMarkers(annotated_frame, corners, ids)
+            #     cv2.drawFrameAxes(annotated_frame, mtx, dist, rvec, tvec, 10)
+            #     # prepare marker and camera overlay strings (store for pygame overlay)
+            #     # marker_pos_str = "MARKER Position x=%4.0f y=%4.0f z=%4.0f" % (tvec.tolist()[0], tvec.tolist()[1], tvec.tolist()[2])
 
-                # Cria os textos separados para cada eixo com a cor correspondente
-                marker_x_str = f"X (vermelho): {tvec[0]:.0f}"
-                marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
-                marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
+            #     # Cria os textos separados para cada eixo com a cor correspondente
+            #     marker_x_str = f"X (vermelho): {tvec[0]:.0f}"
+            #     marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
+            #     marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
 
-                R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
-                R_tc = R_ct.T
-                roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
-                marker_att_str = "MARKER Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
-                    math.degrees(roll_marker), math.degrees(pitch_marker), math.degrees(yaw_marker)
-                )
+            #     R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
+            #     R_tc = R_ct.T
+            #     roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
+            #     marker_att_str = "MARKER Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
+            #         math.degrees(roll_marker), math.degrees(pitch_marker), math.degrees(yaw_marker)
+            #     )
 
-                pos_camera = -R_tc * np.matrix(tvec).T
-                camera_pos_str = "CAMERA Position x=%4.0f  y=%4.0f  z=%4.0f" % (
-                    pos_camera[0].item(), pos_camera[1].item(), pos_camera[2].item()
-                )
+            #     pos_camera = -R_tc * np.matrix(tvec).T
+            #     camera_pos_str = "CAMERA Position x=%4.0f  y=%4.0f  z=%4.0f" % (
+            #         pos_camera[0].item(), pos_camera[1].item(), pos_camera[2].item()
+            #     )
 
-                roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip * R_tc)
-                camera_att_str = "CAMERA Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
-                    math.degrees(roll_camera), math.degrees(pitch_camera), math.degrees(yaw_camera)
-                )
+            #     roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip * R_tc)
+            #     camera_att_str = "CAMERA Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
+            #         math.degrees(roll_camera), math.degrees(pitch_camera), math.degrees(yaw_camera)
+            #     )
 
-                targ_cord_x = m
-                targ_cord_y = n
+            #     targ_cord_x = m
+            #     targ_cord_y = n
 
-                # Original
-                self.xoff = int(targ_cord_x - 480)
-                self.yoff = int(540-targ_cord_y)
-                self.zoff = int(90-tvec[2]) 
-                self.roff = int(95-math.degrees(yaw_marker))
-                vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
-
-                if self.manual_mode == False:
-                    self.yaw_velocity = int(-self.pid_yaw(self.xoff))
-                    self.up_down_velocity = int(-self.pid_throttle(self.yoff))
-                    self.for_back_velocity = int(self.pid_pitch(self.zoff))
-                    self.left_right_velocity = int(self.pid_roll(self.roff))
-                
+            #     # Original
+            #     self.xoff = int(targ_cord_x - 480)
+            #     self.yoff = int(540-targ_cord_y)
+            #     self.zoff = int(90-tvec[2]) 
+            #     self.roff = int(60-math.degrees(yaw_marker))
+            #     vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
 
 
-                # # Corrige/salva o erro/distancia do valor esperado para o valor real (circulo)
-                # self.xoff = int(480-targ_cord_x)
-                # self.yoff = int(540-targ_cord_y)
-                # self.zoff = int(90-tvec[2]) 
-                # self.roff = int(95-math.degrees(yaw_marker))
-                # vTarget = np.array((self.xoff, self.yoff, self.zoff, self.roff))
+                # --- Mostrar offsets diretamente no frame ---
+                # cv2.putText(annotated_frame, f"xoff: {self.xoff}", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                # cv2.putText(annotated_frame, f"yoff: {self.yoff}", (30, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                # cv2.putText(annotated_frame, f"zoff: {self.zoff}", (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                # cv2.putText(annotated_frame, f"roff: {self.roff}", (30, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
-                # if self.manual_mode == False:
-                #     self.yaw_velocity = int(self.pid_yaw(self.xoff))
-                #     self.up_down_velocity = int(self.pid_throttle(self.yoff))
-                #     self.for_back_velocity = int(self.pid_pitch(self.zoff))
-                #     self.left_right_velocity = int(-self.pid_roll(self.roff))
 
-                if -10<self.xoff<10 and -10<self.yoff<10 and -40<self.zoff<40 and self.roff<10:
 
-                    uzaklik = int((0.8883*tvec[2])-3.4264)
-                    print(uzaklik)
-                    self.tello.move_forward(uzaklik+18)
-                    inis = True
-                    say = 1
-                    starttime = time.time()
-                    self.tello.land()
-                    self.send_rc_control = False
+            #     if self.manual_mode == False:
+            #         self.yaw_velocity = int(-self.pid_yaw(self.xoff))
+            #         self.up_down_velocity = int(-self.pid_throttle(self.yoff))
+            #         self.for_back_velocity = int(self.pid_pitch(self.zoff))
+            #         self.left_right_velocity = int(self.pid_roll(self.roff))
 
-                # Salva na lista de overlay_texts para desenhar depois
-                self.overlay_texts = [
-                    marker_x_str,
-                    marker_y_str,
-                    marker_z_str,
-                    marker_att_str,  
-                    camera_pos_str,
-                    camera_att_str
-                ]    
+            #     if -15<self.xoff<15 and -15<self.yoff<15 and -90<self.zoff<90 and self.roff<10 and self.manual_mode == False:
+
+            #         uzaklik = int((0.8883*tvec[2])-3.4264)
+            #         print(uzaklik)
+            #         self.tello.move_forward(uzaklik)
+            #         inis = True
+            #         say = 1
+            #         starttime = time.time()
+            #         self.tello.land()
+            #         self.send_rc_control = False
+
+            #     # Salva na lista de overlay_texts para desenhar depois
+            #     self.overlay_texts = [
+            #         marker_x_str,
+            #         marker_y_str,
+            #         marker_z_str,
+            #         marker_att_str,  
+            #         camera_pos_str,
+            #         camera_att_str
+            #     ]    
 
             else:
                 # Nenhum marcador detectado, zera os offsets
