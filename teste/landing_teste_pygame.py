@@ -106,7 +106,7 @@ class FrontEnd(object):
         # Valores de teste
         self.pid_yaw      = PID(0.20, 0, 0,setpoint=0,output_limits=(-70,70)) 
         self.pid_throttle = PID(0.25, 0, 0,setpoint=0,output_limits=(-40,40)) 
-        self.pid_pitch    = PID(0.25, 0, 0,setpoint=0,output_limits=(-40,40))
+        self.pid_pitch    = PID(0.25, 0, 0,setpoint=0,output_limits=(-20,20))
         self.pid_roll     = PID(0.20, 0, 0,setpoint=0,output_limits=(-40,40))
 
         # pygame helpers for stable overlays
@@ -249,23 +249,25 @@ class FrontEnd(object):
                         vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
 
                         # --- Mostrar offsets diretamente no frame ---
-                        cv2.putText(annotated_frame, f"xoff: {self.xoff}", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                        cv2.putText(annotated_frame, f"yoff: {self.yoff}", (30, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(annotated_frame, f"zoff: {self.zoff}", (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-                        cv2.putText(annotated_frame, f"roff: {self.roff}", (30, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
+                        cv2.putText(annotated_frame, f"YOLO: {self.xoff}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                        cv2.putText(annotated_frame, f"xoff: {self.xoff}", (30, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        cv2.putText(annotated_frame, f"yoff: {self.yoff}", (30, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                        cv2.putText(annotated_frame, f"zoff: {self.zoff}", (30, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                        cv2.putText(annotated_frame, f"roff: {self.roff}", (30, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
 
                         if self.manual_mode == False:
                             self.yaw_velocity = int(-self.pid_yaw(self.xoff))
                             self.up_down_velocity = int(-self.pid_throttle(self.yoff))
                             self.for_back_velocity = int(self.pid_pitch(self.zoff))
-                            self.left_right_velocity = int(self.pid_roll(self.roff))
+                            # self.left_right_velocity = int(self.pid_roll(self.roff))
 
-                        if -15<self.xoff<15 and -15<self.yoff<15 and -90<self.zoff<90 and self.roff<10 and self.manual_mode == False:
+                        if -10<self.xoff<10 and -10<self.yoff<10 and -90<self.zoff<90 and self.manual_mode == False:
+                        # if -15<self.xoff<15 and -15<self.yoff<15 and -90<self.zoff<90 and self.roff<10 and self.manual_mode == False:
 
                             uzaklik = int((0.8883*tvec[2])-3.4264)
                             print(uzaklik)
-                            self.tello.move_forward(uzaklik)
+                            self.tello.move_forward(uzaklik+40)
                             inis = True
                             say = 1
                             starttime = time.time()
@@ -283,51 +285,51 @@ class FrontEnd(object):
                         ]        
 
             # elif ids is not None:
-            # # if np.all(ids != None):
-            #     corner = corners[0][0]
-            #     m = int((corner[0][0]+corner[1][0]+corner[2][0]+corner[3][0])/4)
-            #     n = int((corner[0][1]+corner[1][1]+corner[2][1]+corner[3][1])/4)
-            #     orta = int((corner[0][0]+corner[3][0])/2)
+            if np.all(ids != None):
+                corner = corners[0][0]
+                m = int((corner[0][0]+corner[1][0]+corner[2][0]+corner[3][0])/4)
+                n = int((corner[0][1]+corner[1][1]+corner[2][1]+corner[3][1])/4)
+                orta = int((corner[0][0]+corner[3][0])/2)
 
-            #     # Desenha o canto 1 (Superior Esquerdo - deve corresponder a [-half_size, half_size, 0])
-            #     cv2.circle(annotated_frame, (int(corner[0][0]), int(corner[0][1])), 5, (0, 0, 255), -1) # Vermelho (1)
-            #     # Desenha o canto 2 (Superior Direito - deve corresponder a [half_size, half_size, 0])
-            #     cv2.circle(annotated_frame, (int(corner[1][0]), int(corner[1][1])), 5, (0, 255, 0), -1) # Verde (2)
-            #     # Desenha o canto 3 (Inferior Direito - deve corresponder a [half_size, -half_size, 0])
-            #     cv2.circle(annotated_frame, (int(corner[2][0]), int(corner[2][1])), 5, (255, 0, 0), -1) # Azul (3)
-            #     # Desenha o canto 4 (Inferior Esquerdo - deve corresponder a [-half_size, -half_size, 0])
-            #     cv2.circle(annotated_frame, (int(corner[3][0]), int(corner[3][1])), 5, (0, 255, 255), -1) # Amarelo (4)
+                # Desenha o canto 1 (Superior Esquerdo - deve corresponder a [-half_size, half_size, 0])
+                cv2.circle(annotated_frame, (int(corner[0][0]), int(corner[0][1])), 5, (0, 0, 255), -1) # Vermelho (1)
+                # Desenha o canto 2 (Superior Direito - deve corresponder a [half_size, half_size, 0])
+                cv2.circle(annotated_frame, (int(corner[1][0]), int(corner[1][1])), 5, (0, 255, 0), -1) # Verde (2)
+                # Desenha o canto 3 (Inferior Direito - deve corresponder a [half_size, -half_size, 0])
+                cv2.circle(annotated_frame, (int(corner[2][0]), int(corner[2][1])), 5, (255, 0, 0), -1) # Azul (3)
+                # Desenha o canto 4 (Inferior Esquerdo - deve corresponder a [-half_size, -half_size, 0])
+                cv2.circle(annotated_frame, (int(corner[3][0]), int(corner[3][1])), 5, (0, 255, 255), -1) # Amarelo (4)
 
-            #     # 1. Defina os pontos 3D (coordenadas do marcador)
-            #     half_size = markerSize / 2
-            #     obj_points = np.array([
-            #         [-half_size, half_size, 0],   # Top-Left (ajuste se a sua ordem for diferente)
-            #         [ half_size, half_size, 0],   # Top-Right
-            #         [ half_size, -half_size, 0],  # Bottom-Right
-            #         [-half_size, -half_size, 0]   # Bottom-Left
-            #     ], dtype=np.float32)
+                # 1. Defina os pontos 3D (coordenadas do marcador)
+                half_size = markerSize / 2
+                obj_points = np.array([
+                    [-half_size, half_size, 0],   # Top-Left (ajuste se a sua ordem for diferente)
+                    [ half_size, half_size, 0],   # Top-Right
+                    [ half_size, -half_size, 0],  # Bottom-Right
+                    [-half_size, -half_size, 0]   # Bottom-Left
+                ], dtype=np.float32)
 
-            #     # 2. Use solvePnP (apenas para o primeiro marcador, 'corners[0]')
-            #     image_points = corner.astype(np.float32)
-            #     ret, rvec, tvec = cv2.solvePnP(obj_points, image_points, mtx, dist, flags=cv2.SOLVEPNP_IPPE_SQUARE)
+                # 2. Use solvePnP (apenas para o primeiro marcador, 'corners[0]')
+                image_points = corner.astype(np.float32)
+                ret, rvec, tvec = cv2.solvePnP(obj_points, image_points, mtx, dist, flags=cv2.SOLVEPNP_IPPE_SQUARE)
                 
-            #     # 3. Formate rvec e tvec
-            #     rvec = rvec.flatten()
-            #     tvec = tvec.flatten()
+                # 3. Formate rvec e tvec
+                rvec = rvec.flatten()
+                tvec = tvec.flatten()
 
-            #     aruco.drawDetectedMarkers(annotated_frame, corners, ids)
-            #     cv2.drawFrameAxes(annotated_frame, mtx, dist, rvec, tvec, 10)
+                aruco.drawDetectedMarkers(annotated_frame, corners, ids)
+                cv2.drawFrameAxes(annotated_frame, mtx, dist, rvec, tvec, 10)
             #     # prepare marker and camera overlay strings (store for pygame overlay)
             #     # marker_pos_str = "MARKER Position x=%4.0f y=%4.0f z=%4.0f" % (tvec.tolist()[0], tvec.tolist()[1], tvec.tolist()[2])
 
-            #     # Cria os textos separados para cada eixo com a cor correspondente
-            #     marker_x_str = f"X (vermelho): {tvec[0]:.0f}"
-            #     marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
-            #     marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
+                # Cria os textos separados para cada eixo com a cor correspondente
+                marker_x_str = f"X (vermelho): {tvec[0]:.0f}"
+                marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
+                marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
 
-            #     R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
-            #     R_tc = R_ct.T
-            #     roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
+                R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
+                R_tc = R_ct.T
+                roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
             #     marker_att_str = "MARKER Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
             #         math.degrees(roll_marker), math.degrees(pitch_marker), math.degrees(yaw_marker)
             #     )
@@ -342,23 +344,22 @@ class FrontEnd(object):
             #         math.degrees(roll_camera), math.degrees(pitch_camera), math.degrees(yaw_camera)
             #     )
 
-            #     targ_cord_x = m
-            #     targ_cord_y = n
+                targ_cord_x = m
+                targ_cord_y = n
 
-            #     # Original
-            #     self.xoff = int(targ_cord_x - 480)
-            #     self.yoff = int(540-targ_cord_y)
-            #     self.zoff = int(90-tvec[2]) 
-            #     self.roff = int(60-math.degrees(yaw_marker))
-            #     vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
-
+                # Original
+                self.xoff = int(targ_cord_x - 480)
+                self.yoff = int(540-targ_cord_y)
+                self.zoff = int(90-tvec[2]) 
+                self.roff = int(60-math.degrees(yaw_marker))
+                vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
 
                 # --- Mostrar offsets diretamente no frame ---
-                # cv2.putText(annotated_frame, f"xoff: {self.xoff}", (30, 80), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
-                # cv2.putText(annotated_frame, f"yoff: {self.yoff}", (30, 110), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                # cv2.putText(annotated_frame, f"zoff: {self.zoff}", (30, 140), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
-                # cv2.putText(annotated_frame, f"roff: {self.roff}", (30, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
-
+                cv2.putText(annotated_frame, f"OPENCV: {self.xoff}", (130, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                cv2.putText(annotated_frame, f"xoff: {self.xoff}", (130, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                cv2.putText(annotated_frame, f"yoff: {self.yoff}", (130, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
+                cv2.putText(annotated_frame, f"zoff: {self.zoff}", (130, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                cv2.putText(annotated_frame, f"roff: {self.roff}", (130, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
 
             #     if self.manual_mode == False:
