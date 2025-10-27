@@ -144,3 +144,8 @@ Temporary Items
 
 treinamento
 runs
+
+dataset
+dataset_yolo  
+
+yolov8n.pt
