@@ -1,0 +1,12 @@
+# train: dataset_yolo/train
+# val: dataset_yolo/val
+
+# nc: 1
+# names: ["aruco9"]
+
+
+train: dataset_tello/train/
+val: dataset_tello/val/
+
+nc: 1
+names: ["aruco9"]
