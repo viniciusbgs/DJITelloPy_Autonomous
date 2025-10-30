@@ -3,3 +3,5 @@ pillow>=8.4.0
 ultralytics
 scikit-learn
 djitellopy
+simple_pid
+pygame

@@ -95,7 +95,7 @@ while True:
         if is_target_detected:
             filename = f"{output_dir}/frame_{count:04d}.jpg"
             cv2.imwrite(filename, original_frame)
-            print(f"📸 Foto salva: {filename}")
+            print(f" Foto salva: {filename}")
             count += 1
         else:
             print("Marcador não detectado. Foto NÃO salva.")

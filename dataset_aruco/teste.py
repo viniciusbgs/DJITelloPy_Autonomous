@@ -31,4 +31,4 @@ for split in ["train", "val"]:
                     print(f"[ERRO] {file}: {e}")
         with open(path, "w") as f:
             f.write("\n".join(new_lines))
-print("✅ Labels revisados: nenhum class_id negativo ou inválido restante!")
+print("Labels revisados: nenhum class_id negativo ou inválido restante!")

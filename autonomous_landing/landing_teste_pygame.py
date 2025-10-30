@@ -244,15 +244,15 @@ class FrontEnd(object):
                         # Original
                         self.xoff = int(targ_cord_x - 480)
                         self.yoff = int(540-targ_cord_y)
-                        self.zoff = int(60-tvec[2]) 
+                        self.zoff = int(50-tvec[2]) 
                         self.roff = int(95-math.degrees(yaw_marker))
                         vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
 
                         # --- Mostrar offsets diretamente no frame ---
-                        cv2.putText(annotated_frame, f"YOLO: {self.xoff}", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
-                        cv2.putText(annotated_frame, f"xoff: {self.xoff}", (30, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
+                        cv2.putText(annotated_frame, f"YOLO", (30, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                        cv2.putText(annotated_frame, f"xoff: {self.xoff}", (30, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
                         cv2.putText(annotated_frame, f"yoff: {self.yoff}", (30, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
-                        cv2.putText(annotated_frame, f"zoff: {self.zoff}", (30, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
+                        cv2.putText(annotated_frame, f"zoff: {self.zoff}", (30, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                         cv2.putText(annotated_frame, f"roff: {self.roff}", (30, 260), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 0), 2)
 
 
@@ -262,7 +262,7 @@ class FrontEnd(object):
                             self.for_back_velocity = int(self.pid_pitch(self.zoff))
                             # self.left_right_velocity = int(self.pid_roll(self.roff))
 
-                        if -10<self.xoff<10 and -10<self.yoff<10 and -90<self.zoff<90 and self.manual_mode == False:
+                        if -10<self.xoff<10 and -10<self.yoff<10 and -100<self.zoff<100 and self.manual_mode == False:
                         # if -15<self.xoff<15 and -15<self.yoff<15 and -90<self.zoff<90 and self.roff<10 and self.manual_mode == False:
 
                             uzaklik = int((0.8883*tvec[2])-3.4264)
