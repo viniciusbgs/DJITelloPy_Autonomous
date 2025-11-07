@@ -7,6 +7,13 @@ from ultralytics import YOLO
 from cv2 import aruco
 import math  
 from simple_pid import PID
+from mpl_toolkits.mplot3d import Axes3D
+import matplotlib.pyplot as plt
+import csv
+import os
+import datetime
+import time
+
 
 model = YOLO("/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/aruco_yolo_model/train28/weights/best.pt")
 
@@ -17,6 +24,8 @@ parameters =  aruco.DetectorParameters()
 
 mtx = np.load('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/mtx.npy')
 dist = np.load('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/dist.npy')
+
+
 
 # Speed of the drone
 S = 30
@@ -96,6 +105,16 @@ class FrontEnd(object):
         self.manual_mode = True  # começa em manual
         self.send_rc_control = False
 
+        # Variável para armazenar o tempo de pouso
+        self.landing_start_time = None
+        self.landing_time_seconds = 0.0
+
+        # Trajetória: lista de tuplas (timestamp, x, y, z)
+        self.trajectory = []
+        # caminho para salvar csv/figura
+        self.output_folder = os.path.expanduser('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/drone_trajectory_outputs')
+        os.makedirs(self.output_folder, exist_ok=True)
+
         """
         yaw: rotação (gira esquerda/direita)
         throttle: altitude (sobe/desce)
@@ -104,7 +123,7 @@ class FrontEnd(object):
         """
 
         # Valores de teste
-        self.pid_yaw      = PID(0.20, 0, 0,setpoint=0,output_limits=(-70,70)) 
+        self.pid_yaw      = PID(0.15, 0, 0,setpoint=0,output_limits=(-70,70)) 
         self.pid_throttle = PID(0.25, 0, 0,setpoint=0,output_limits=(-40,40)) 
         self.pid_pitch    = PID(0.25, 0, 0,setpoint=0,output_limits=(-20,20))
         self.pid_roll     = PID(0.20, 0, 0,setpoint=0,output_limits=(-40,40))
@@ -125,6 +144,11 @@ class FrontEnd(object):
 
     def run(self):
 
+
+        # inicializa cálculo de FPS
+        prev_time = 0
+        fps = 0
+
         self.tello.connect()
         self.tello.set_speed(self.speed)
 
@@ -144,7 +168,9 @@ class FrontEnd(object):
                     should_stop = True
                 elif event.type == pygame.KEYDOWN:
                     if event.key == pygame.K_ESCAPE:
+                        self.save_trajectory_and_plot('voo1')
                         should_stop = True
+
                     else:
                         self.keydown(event.key)
                 elif event.type == pygame.KEYUP:
@@ -162,6 +188,18 @@ class FrontEnd(object):
 
             # Copia o frame cru
             frame = frame_read.frame.copy()
+
+
+            # calcula FPS
+            current_time = time.time()
+            fps = 1 / (current_time - prev_time) if prev_time != 0 else 0
+            prev_time = current_time
+
+            # escreve o valor do FPS no frame
+            cv2.putText(frame, f"FPS: {fps:.1f}", (10, 30), cv2.FONT_HERSHEY_SIMPLEX,
+            1, (0, 255, 0), 2)
+
+
             # Faz a inferência só com a imagem "limpa"
             results = model.predict(source=frame, conf=0.8, iou=0.2, device="mps", imgsz=640, verbose=False)
 
@@ -239,17 +277,26 @@ class FrontEnd(object):
             #             # marker_y_str = f"Y (verde)  : {tvec[1]:.0f}"
             #             # # marker_z_str = f"Z (azul)   : {tvec[2]:.0f}"
 
-            #             # R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
-            #             # R_tc = R_ct.T
+            #             R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
+            #             R_tc = R_ct.T
             #             # roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
             #             # marker_att_str = "MARKER Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
             #             #     math.degrees(roll_marker), math.degrees(pitch_marker), math.degrees(yaw_marker)
             #             # )
 
-            #             # pos_camera = -R_tc * np.matrix(tvec).T
+
+            #             pos_camera = -R_tc * np.matrix(tvec).T
             #             # camera_pos_str = "CAMERA Position x=%4.0f  y=%4.0f  z=%4.0f" % (
             #             #     pos_camera[0].item(), pos_camera[1].item(), pos_camera[2].item()
             #             # )
+            #             pos = np.array(pos_camera).flatten()  # [x, y, z]
+
+            #             # Salvar posição + timestamp (sua parte)
+            #             ts = datetime.datetime.now().isoformat()
+            #             self.trajectory.append((ts, float(pos[0]), float(pos[1]), float(pos[2])))
+
+
+           
 
             #             # roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip * R_tc)
             #             # camera_att_str = "CAMERA Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
@@ -290,6 +337,8 @@ class FrontEnd(object):
             #                 starttime = time.time()
             #                 self.tello.land()
             #                 self.send_rc_control = False
+            #                 self.manual_mode = True
+            #                 self.save_trajectory_and_plot('voo1')
 
 
                         # # Salva na lista de overlay_texts para desenhar depois
@@ -302,7 +351,7 @@ class FrontEnd(object):
                         #     camera_att_str
                         # ]        
 
-            # # elif ids is not None:
+            # elif ids is not None:
             if np.all(ids != None):
                 corner = corners[0][0]
                 m = int((corner[0][0]+corner[1][0]+corner[2][0]+corner[3][0])/4)
@@ -348,14 +397,22 @@ class FrontEnd(object):
                 R_ct = np.matrix(cv2.Rodrigues(rvec)[0])
                 R_tc = R_ct.T
                 roll_marker, pitch_marker, yaw_marker = rotationMatrixToEulerAngles(R_flip * R_tc)
+
+                
             #     marker_att_str = "MARKER Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
             #         math.degrees(roll_marker), math.degrees(pitch_marker), math.degrees(yaw_marker)
             #     )
 
-            #     pos_camera = -R_tc * np.matrix(tvec).T
-            #     camera_pos_str = "CAMERA Position x=%4.0f  y=%4.0f  z=%4.0f" % (
-            #         pos_camera[0].item(), pos_camera[1].item(), pos_camera[2].item()
-            #     )
+                pos_camera = -R_tc * np.matrix(tvec).T
+                # camera_pos_str = "CAMERA Position x=%4.0f  y=%4.0f  z=%4.0f" % (
+                #     pos_camera[0].item(), pos_camera[1].item(), pos_camera[2].item()
+                # )
+                pos = np.array(pos_camera).flatten()  # [x, y, z]
+
+                # Salvar posição + timestamp (sua parte)
+                ts = datetime.datetime.now().isoformat()
+                self.trajectory.append((ts, float(pos[0]), float(pos[1]), float(pos[2])))
+
 
             #     roll_camera, pitch_camera, yaw_camera = rotationMatrixToEulerAngles(R_flip * R_tc)
             #     camera_att_str = "CAMERA Attitude r=%4.0f  p=%4.0f  y=%4.0f" % (
@@ -373,7 +430,7 @@ class FrontEnd(object):
                 vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
 
                 # --- Mostrar offsets diretamente no frame ---
-                cv2.putText(annotated_frame, f"OPENCV: {self.xoff}", (130, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
+                # cv2.putText(annotated_frame, f"OPENCV: {self.xoff}", (130, 150), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 0), 2)
                 cv2.putText(annotated_frame, f"xoff: {self.xoff}", (130, 170), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 0, 255), 2)
                 cv2.putText(annotated_frame, f"yoff: {self.yoff}", (130, 200), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (0, 255, 0), 2)
                 cv2.putText(annotated_frame, f"zoff: {self.zoff}", (130, 230), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 0, 0), 2)
@@ -386,17 +443,28 @@ class FrontEnd(object):
                         self.for_back_velocity = int(self.pid_pitch(self.zoff))
                         # self.left_right_velocity = int(self.pid_roll(self.roff))
 
-                if -10<self.xoff<10 and -10<self.yoff<10 and -100<self.zoff<100 and self.manual_mode == False:
+                if -15<self.xoff<15 and -15<self.yoff<15 and -100<self.zoff<100 and self.manual_mode == False:
                 # if -15<self.xoff<15 and -15<self.yoff<15 and -90<self.zoff<90 and self.roff<10 and self.manual_mode == False:
 
                     uzaklik = int((0.8883*tvec[2])-3.4264)
                     print(uzaklik)
-                    self.tello.move_forward(uzaklik+30)
+                    self.tello.move_forward(uzaklik)
                     inis = True
                     say = 1
                     starttime = time.time()
                     self.tello.land()
                     self.send_rc_control = False
+                    self.manual_mode = True
+
+                    # --- NOVO: Calcula o tempo FINAL do pouso autônomo ---
+                    if self.landing_start_time is not None:
+                        self.landing_time_seconds = time.time() - self.landing_start_time
+                        print(f"Tempo de Pouso Autônomo: {self.landing_time_seconds:.2f} segundos.")
+                        self.landing_start_time = None # Reseta para um novo voo
+                    # ---------------------------------------------------
+
+                    self.save_trajectory_and_plot('voo1')
+
 
             
 
@@ -418,7 +486,7 @@ class FrontEnd(object):
                     self.zoff = 0
                     self.roff = 0
                 # clear overlay texts when no marker
-                self.overlay_texts = []
+                # self.overlay_texts = []
                 annotated_frame = frame 
 
             cv2.line(annotated_frame, (480, 0), (480, 1080), (255, 0, 0), 2)  # linha vertical do centro
@@ -592,6 +660,65 @@ class FrontEnd(object):
                 direcoes.append("PARADO")
 
             print("O drone está " + ", ".join(direcoes))
+
+    # --- AO TERMINAR O VOO / AO POUSAR OU QUANDO SAIR DO LOOP PRINCIPAL ---
+    # por exemplo, logo antes de self.tello.end() ou quando detectar land():
+    def save_trajectory_and_plot(self, filename_prefix='traj'):
+        if len(self.trajectory) == 0:
+            print("Nenhuma posição registrada para plotar.")
+            return
+
+        # separa colunas
+        times = [r[0] for r in self.trajectory]
+        xs = [r[1] for r in self.trajectory]
+        ys = [r[2] for r in self.trajectory]
+        zs = [r[3] for r in self.trajectory]
+
+        # salva CSV
+        csv_path = os.path.join(self.output_folder, f"{filename_prefix}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
+        with open(csv_path, 'w', newline='') as f:
+            writer = csv.writer(f)
+            writer.writerow(['timestamp','x','y','z'])
+            writer.writerows(self.trajectory)
+        print("Trajetória salva em:", csv_path)
+
+        # Plota (3D)
+        fig = plt.figure(figsize=(9,6))
+        ax = fig.add_subplot(111, projection='3d')
+        
+        # --- ALTERAÇÃO AQUI: USAR SCATTER COM MAPA DE CORES 'Z' ---
+        # 'c=zs' define a cor de cada ponto pela sua coordenada Z
+        # 'cmap='jet'' define o mapa de cores a ser usado
+        # 's=5' define o tamanho do ponto
+        # 'marker' define o formato (pontos)
+        plot = ax.scatter(xs, ys, zs, c=zs, cmap='jet', marker='o', s=5)
+        
+        # Adiciona a barra de cores para indicar a escala de Z
+        fig.colorbar(plot, ax=ax, orientation='vertical', pad=0.1, label='Altura Z')
+        
+        # Opcional: Para ainda ter uma linha que conecta os pontos (se preferir):
+        # ax.plot(xs, ys, zs, color='gray', linestyle='--')
+        
+        ax.scatter(xs[0:1], ys[0:1], zs[0:1], marker='o', s=40, color='green', label='Decolagem')  # ponto de decolagem
+        ax.scatter(xs[-1:], ys[-1:], zs[-1:], marker='x', s=60, color='red', label='Pouso')      # ponto de pouso
+        ax.set_xlabel("X")
+        ax.set_ylabel("Y")
+        ax.set_zlabel("Z - Altura") # Atualizado para Altura
+        ax.set_title('Trajetória 3D do drone (Cor por Altura Z)')
+        plt.tight_layout()
+        # ------------------------------------------------------------------
+
+        # salva figura
+        fig_path = os.path.join(self.output_folder, f"{filename_prefix}_plot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+        plt.savefig(fig_path)
+        print("Gráfico salvo em:", fig_path)
+
+        # também mostra em tela (se rodando em ambiente com display)
+        try:
+            plt.show()
+        except Exception as e:
+            print("Não foi possível exibir a figura na tela:", e)
+        plt.close(fig)
 
 def main():
     frontend = FrontEnd()
