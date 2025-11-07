@@ -152,3 +152,6 @@ yolov8n.pt
 drone_trajectory_outputs
 
 trajetoria
+
+calibracao_camera/images
+calibracao_camera/resultado_calibracao

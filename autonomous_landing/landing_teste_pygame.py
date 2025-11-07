@@ -13,6 +13,7 @@ import csv
 import os
 import datetime
 import time
+from matplotlib import cm
 
 
 model = YOLO("/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/aruco_yolo_model/train28/weights/best.pt")
@@ -201,7 +202,7 @@ class FrontEnd(object):
 
 
             # Faz a inferência só com a imagem "limpa"
-            results = model.predict(source=frame, conf=0.8, iou=0.2, device="mps", imgsz=640, verbose=False)
+            results = model.predict(source=frame, conf=0.9, iou=0.2, device="mps", imgsz=640, verbose=False)
 
             # Usa um frame separado para desenhar textos e overlays
             annotated_frame = frame.copy()
@@ -331,11 +332,18 @@ class FrontEnd(object):
 
             #                 uzaklik = int((0.8883*tvec[2])-3.4264)
             #                 print(uzaklik)
-            #                 self.tello.move_forward(uzaklik+30)
+            #                 self.tello.move_forward(uzaklik)
             #                 inis = True
             #                 say = 1
             #                 starttime = time.time()
             #                 self.tello.land()
+
+            #                 # ---Calcula o tempo FINAL do pouso autônomo ---
+            #                 if self.landing_start_time is not None:
+            #                     self.landing_time_seconds = time.time() - self.landing_start_time
+            #                     print(f"Tempo de Pouso Autônomo: {self.landing_time_seconds:.2f} segundos.")
+            #                     self.landing_start_time = None # Reseta para um novo voo
+
             #                 self.send_rc_control = False
             #                 self.manual_mode = True
             #                 self.save_trajectory_and_plot('voo1')
@@ -568,9 +576,9 @@ class FrontEnd(object):
         elif key == pygame.K_a or key == pygame.K_d:  # set zero yaw velocity
             self.yaw_velocity = 0
         elif key == pygame.K_t:  # takeoff
-            self.tello.takeoff()
-            self.send_rc_control = True
-            self.tello.rotate_clockwise(25)
+            # self.tello.takeoff()
+            # self.send_rc_control = True
+            # self.tello.rotate_clockwise(25)
             print("takeoff")
         elif key == pygame.K_l:  # land
             not self.tello.land()
@@ -663,63 +671,69 @@ class FrontEnd(object):
 
     # --- AO TERMINAR O VOO / AO POUSAR OU QUANDO SAIR DO LOOP PRINCIPAL ---
     # por exemplo, logo antes de self.tello.end() ou quando detectar land():
-    def save_trajectory_and_plot(self, filename_prefix='traj'):
-        if len(self.trajectory) == 0:
-            print("Nenhuma posição registrada para plotar.")
+        
+    def save_trajectory_and_plot(self, flight_name):
+        """Salva a trajetória em CSV e gera o gráfico 3D com tempo no colorbar."""
+        if not self.trajectory:
+            print("Nenhuma trajetória registrada.")
             return
 
-        # separa colunas
-        times = [r[0] for r in self.trajectory]
-        xs = [r[1] for r in self.trajectory]
-        ys = [r[2] for r in self.trajectory]
-        zs = [r[3] for r in self.trajectory]
-
-        # salva CSV
-        csv_path = os.path.join(self.output_folder, f"{filename_prefix}_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.csv")
-        with open(csv_path, 'w', newline='') as f:
+        csv_path = os.path.join(self.output_folder, f"{flight_name}.csv")
+        with open(csv_path, mode='w', newline='') as f:
             writer = csv.writer(f)
-            writer.writerow(['timestamp','x','y','z'])
+            writer.writerow(['timestamp', 'x', 'y', 'z'])
             writer.writerows(self.trajectory)
-        print("Trajetória salva em:", csv_path)
+        print(f"Trajetória salva em {csv_path}")
 
-        # Plota (3D)
-        fig = plt.figure(figsize=(9,6))
+        # Extrai dados
+        timestamps = [datetime.datetime.fromisoformat(t[0]) for t in self.trajectory]
+        x = [t[1] for t in self.trajectory]
+        y = [t[2] for t in self.trajectory]
+        z = [t[3] for t in self.trajectory]
+
+        # Converte timestamps em segundos desde o início
+        t0 = timestamps[0]
+        time_seconds = np.array([(t - t0).total_seconds() for t in timestamps])
+
+        # Cria gráfico 3D
+        fig = plt.figure()
         ax = fig.add_subplot(111, projection='3d')
-        
-        # --- ALTERAÇÃO AQUI: USAR SCATTER COM MAPA DE CORES 'Z' ---
-        # 'c=zs' define a cor de cada ponto pela sua coordenada Z
-        # 'cmap='jet'' define o mapa de cores a ser usado
-        # 's=5' define o tamanho do ponto
-        # 'marker' define o formato (pontos)
-        plot = ax.scatter(xs, ys, zs, c=zs, cmap='jet', marker='o', s=5)
-        
-        # Adiciona a barra de cores para indicar a escala de Z
-        fig.colorbar(plot, ax=ax, orientation='vertical', pad=0.1, label='Altura Z')
-        
-        # Opcional: Para ainda ter uma linha que conecta os pontos (se preferir):
-        # ax.plot(xs, ys, zs, color='gray', linestyle='--')
-        
-        ax.scatter(xs[0:1], ys[0:1], zs[0:1], marker='o', s=40, color='green', label='Decolagem')  # ponto de decolagem
-        ax.scatter(xs[-1:], ys[-1:], zs[-1:], marker='x', s=60, color='red', label='Pouso')      # ponto de pouso
-        ax.set_xlabel("X")
-        ax.set_ylabel("Y")
-        ax.set_zlabel("Z - Altura") # Atualizado para Altura
-        ax.set_title('Trajetória 3D do drone (Cor por Altura Z)')
-        plt.tight_layout()
-        # ------------------------------------------------------------------
 
-        # salva figura
-        fig_path = os.path.join(self.output_folder, f"{filename_prefix}_plot_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.png")
+        # Cria o mapa de cores baseado no tempo
+        norm = plt.Normalize(time_seconds.min(), time_seconds.max())
+        colors = cm.viridis(norm(time_seconds))
+
+        # Plota a trajetória com gradiente de tempo
+        ax.scatter(x, y, z, c=colors, marker='o', s=15)
+        ax.plot(x, y, z, color='gray', linewidth=1, alpha=0.4)
+
+        # Rótulos e título
+        ax.set_xlabel('X (cm)')
+        ax.set_ylabel('Y (cm)')
+        ax.set_zlabel('Z (cm)')
+        ax.set_title(f"Trajetória 3D - {flight_name}")
+
+        # Barra de cores com tempo
+        cbar = fig.colorbar(cm.ScalarMappable(norm=norm, cmap='viridis'), ax=ax, pad=0.1)
+        cbar.set_label('Tempo (s)')
+        cbar.set_ticks(np.linspace(time_seconds.min(), time_seconds.max(), 5))
+        cbar.ax.set_yticklabels([f"{t:.1f}" for t in np.linspace(time_seconds.min(), time_seconds.max(), 5)])
+
+        # Ajustes visuais
+        ax.view_init(elev=25, azim=-60)
+        ax.grid(True)
+
+        # Salva figura
+        fig_path = os.path.join(self.output_folder, f"{flight_name}_3d.png")
         plt.savefig(fig_path)
-        print("Gráfico salvo em:", fig_path)
+        print(f"Gráfico salvo em {fig_path}")
 
-        # também mostra em tela (se rodando em ambiente com display)
         try:
             plt.show()
         except Exception as e:
             print("Não foi possível exibir a figura na tela:", e)
         plt.close(fig)
-
+        
 def main():
     frontend = FrontEnd()
 
