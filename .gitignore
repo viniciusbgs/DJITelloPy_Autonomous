@@ -148,3 +148,7 @@ runs
 dataset_tello
 
 yolov8n.pt
+
+drone_trajectory_outputs
+
+trajetoria
