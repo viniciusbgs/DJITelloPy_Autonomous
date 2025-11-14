@@ -861,24 +861,27 @@ class FrontEnd(object):
         # ===== SUBPLOT 4: ERRO EM X E Y =====
         fig.add_trace(
             go.Scatter(
-                x=time_seconds,
-                y=[self.erro_x] * len(time_seconds),
-                mode='lines',
-                name='Erro X',
-                line=dict(color='red', width=3),
-                yaxis='y4'
+                x=[self.erro_x],
+                y=[self.erro_y],
+                mode='markers',
+                name='Erro Final',
+                marker=dict(size=15, color='orange', symbol='circle'),
+                text=[f"Erro X: {self.erro_x:.2f} cm<br>Erro Y: {self.erro_y:.2f} cm"],
+                hoverinfo='text',
+                showlegend=True
             ),
             row=1, col=4
         )
 
+        # Adicionar origem (0, 0) como referência
         fig.add_trace(
             go.Scatter(
-                x=time_seconds,
-                y=[self.erro_y] * len(time_seconds),
-                mode='lines',
-                name='Erro Y',
-                line=dict(color='green', width=3),
-                yaxis='y4'
+                x=[0],
+                y=[0],
+                mode='markers',
+                name='Centro (0, 0)',
+                marker=dict(size=12, color='green', symbol='x'),
+                showlegend=True
             ),
             row=1, col=4
         )
@@ -907,8 +910,8 @@ class FrontEnd(object):
         )
 
         # Subplot 4
-        fig.update_xaxes(title_text="Tempo (s)", row=1, col=4)
-        fig.update_yaxes(title_text="Erro (cm)", row=1, col=4)
+        fig.update_xaxes(title_text="Erro em X (cm)", row=1, col=4)
+        fig.update_yaxes(title_text="Erro em Y (cm)", row=1, col=4)
 
         # ===== ATUALIZAR LAYOUT GERAL =====
         fig.update_layout(
