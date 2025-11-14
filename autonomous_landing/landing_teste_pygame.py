@@ -859,6 +859,27 @@ class FrontEnd(object):
         )
 
         # ===== SUBPLOT 4: ERRO EM X E Y =====
+        # Tamanho do ArUco em cm (metade para cada lado)
+        half_marker_size = markerSize / 2
+        
+        # Criar quadrado ao redor do centro
+        square_x = [-half_marker_size, half_marker_size, half_marker_size, -half_marker_size, -half_marker_size]
+        square_y = [-half_marker_size, -half_marker_size, half_marker_size, half_marker_size, -half_marker_size]
+        
+        fig.add_trace(
+            go.Scatter(
+                x=square_x,
+                y=square_y,
+                mode='lines',
+                name='Área do ArUco',
+                line=dict(color='gray', width=2, dash='dash'),
+                fill='toself',
+                fillcolor='rgba(200, 200, 200, 0.2)',
+                showlegend=True
+            ),
+            row=1, col=4
+        )
+        
         fig.add_trace(
             go.Scatter(
                 x=[self.erro_x],
