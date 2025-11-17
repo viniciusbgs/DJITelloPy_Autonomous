@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 
 model = YOLO("/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/aruco_yolo_model/train28/weights/best.pt")
 
-markerSize = 15
+markerSize = 16.4
 
 
 aruco_dict = cv2.aruco.getPredefinedDictionary(cv2.aruco.DICT_ARUCO_ORIGINAL)
@@ -39,6 +39,8 @@ parameters.adaptiveThreshConstant = 5.0
 mtx = np.load('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/mtx.npy')
 dist = np.load('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/dist.npy')
 
+
+grau = 0
 
 # Speed of the drone
 S = 30
@@ -125,7 +127,7 @@ class FrontEnd(object):
         # Trajetória: lista de tuplas (timestamp, x, y, z)
         self.trajectory = []
         # caminho para salvar csv/figura
-        self.output_folder = os.path.expanduser('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/drone_trajectory_outputs')
+        self.output_folder = os.path.expanduser('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/drone_trajectory_outputs/yolo')
         os.makedirs(self.output_folder, exist_ok=True)
 
         # Ajuste final a ser usado antes do pouso (preenchido na detecção do marcador)
@@ -143,9 +145,9 @@ class FrontEnd(object):
         """
 
         # Valores de teste
-        self.pid_yaw      = PID(0.15, 0, 0,setpoint=0,output_limits=(-70,70)) 
-        self.pid_throttle = PID(0.25, 0, 0,setpoint=0,output_limits=(-40,40)) 
-        self.pid_pitch    = PID(0.25, 0, 0,setpoint=0,output_limits=(-20,20))
+        self.pid_yaw      = PID(0.15, 0, 0,setpoint=0,output_limits=(-50,50)) 
+        self.pid_throttle = PID(0.25, 0, 0,setpoint=0,output_limits=(-30,30)) 
+        self.pid_pitch    = PID(0.22, 0, 0,setpoint=0,output_limits=(-20,20))
         self.pid_roll     = PID(0.20, 0, 0,setpoint=0,output_limits=(-40,40))
 
         # pygame helpers for stable overlays
@@ -313,7 +315,7 @@ class FrontEnd(object):
 
                         self.xoff = int(targ_cord_x - 480)
                         self.yoff = int(540-targ_cord_y)
-                        self.zoff = int(30-tvec[2]) 
+                        self.zoff = int(39-tvec[2]) 
                         # self.roff = int(95-math.degrees(yaw_marker))
                         vTarget = np.array((self.xoff,self.yoff,self.zoff,self.roff))
 
@@ -330,7 +332,7 @@ class FrontEnd(object):
                             self.for_back_velocity = int(self.pid_pitch(self.zoff))
                             # self.left_right_velocity = int(self.pid_roll(self.roff))
 
-                        if -15<self.xoff<15 and -25<self.yoff<25 and -30<self.zoff<30 and self.manual_mode == False:
+                        if -15<self.xoff<15 and -30<self.yoff<30 and -40<self.zoff<40 and self.manual_mode == False:
                         # if -15<self.xoff<15 and -15<self.yoff<15 and -90<self.zoff<90 and self.roff<10 and self.manual_mode == False:
 
                             # Ajuste final de deslocamento antes do pouso (em cm)
@@ -339,12 +341,12 @@ class FrontEnd(object):
                             print(self.ajuste_final)
 
                             # Adiciona um ponto final na trajetória: copia do último e ajusta o valor Z
-                            if len(self.trajectory) > 0:
-                                last_ts, last_x, last_y, last_z = self.trajectory[-1]
-                                new_ts = datetime.datetime.now().isoformat()
-                                # adiciona ajuste_final ao último z
-                                new_point = (new_ts, float(last_x), float(last_y), float(last_z) + float(self.ajuste_final))
-                                self.trajectory.append(new_point)
+                            # if len(self.trajectory) > 0:
+                            #     last_ts, last_x, last_y, last_z = self.trajectory[-1]
+                            #     new_ts = datetime.datetime.now().isoformat()
+                            #     # adiciona ajuste_final ao último z
+                            #     new_point = (new_ts, float(last_x), float(last_y), float(last_z) + float(self.ajuste_final))
+                            #     self.trajectory.append(new_point)
 
                             # Move e pousa usando o ajuste final
                             try:
@@ -368,17 +370,17 @@ class FrontEnd(object):
                                 self.erro_x = 0.0
                                 self.erro_y = 0.0
 
-                            # Após o pouso, adicionar ponto final na trajetória
-                            try:
-                                if len(self.trajectory) > 0:
-                                    last_ts, last_x, last_y, last_z = self.trajectory[-1]
-                                    new_ts_landed = datetime.datetime.now().isoformat()
-                                    landed_height = float(self.tello.get_height())
-                                    # x e z permanecem iguais, y passa a ser a altura do drone (esperado 0)
-                                    final_point = (new_ts_landed, float(last_x), landed_height, float(last_z))
-                                    self.trajectory.append(final_point)
-                            except Exception as e:
-                                print("Erro ao adicionar ponto final após pouso:", e)
+                            # # Após o pouso, adicionar ponto final na trajetória
+                            # try:
+                            #     if len(self.trajectory) > 0:
+                            #         last_ts, last_x, last_y, last_z = self.trajectory[-1]
+                            #         new_ts_landed = datetime.datetime.now().isoformat()
+                            #         landed_height = float(self.tello.get_height())
+                            #         # x e z permanecem iguais, y passa a ser a altura do drone (esperado 0)
+                            #         final_point = (new_ts_landed, float(last_x), landed_height, float(last_z))
+                            #         self.trajectory.append(final_point)
+                            # except Exception as e:
+                            #     print("Erro ao adicionar ponto final após pouso:", e)
 
                             self.send_rc_control = False
                             self.manual_mode = True
@@ -636,7 +638,7 @@ class FrontEnd(object):
         elif key == pygame.K_t:  # takeoff
             self.tello.takeoff()
             self.send_rc_control = True
-            self.tello.rotate_clockwise(25)
+            self.tello.rotate_clockwise(grau)
             print("takeoff")
         elif key == pygame.K_l:  # land
             not self.tello.land()
@@ -704,8 +706,9 @@ class FrontEnd(object):
         existing_experiments = [f for f in os.listdir(self.output_folder) if f.startswith('experimento') and f.endswith('.csv')]
         experiment_number = len(existing_experiments) + 1
         
-        csv_path = os.path.join(self.output_folder, f"experimento{experiment_number}.csv")
-        html_path = os.path.join(self.output_folder, f"experimento{experiment_number}.html")
+        # Incluir o valor de `grau` no nome dos arquivos
+        csv_path = os.path.join(self.output_folder, f"experimento{experiment_number}_g{grau}.csv")
+        html_path = os.path.join(self.output_folder, f"experimento{experiment_number}_g{grau}.html")
 
         # Salvar trajetória em CSV
         with open(csv_path, 'w', newline='') as csvfile:
