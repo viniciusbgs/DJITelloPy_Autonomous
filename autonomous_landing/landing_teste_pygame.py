@@ -40,7 +40,7 @@ mtx = np.load('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/mtx.npy')
 dist = np.load('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/dist.npy')
 
 
-grau = 0
+grau = 25
 
 # Speed of the drone
 S = 30
@@ -127,7 +127,7 @@ class FrontEnd(object):
         # Trajetória: lista de tuplas (timestamp, x, y, z)
         self.trajectory = []
         # caminho para salvar csv/figura
-        self.output_folder = os.path.expanduser('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/drone_trajectory_outputs/yolo')
+        self.output_folder = os.path.expanduser('/Users/vinicius/GITHUB/DJITelloPy/autonomous_landing/drone_trajectory_outputs/longa_distancia/yolo')
         os.makedirs(self.output_folder, exist_ok=True)
 
         # Ajuste final a ser usado antes do pouso (preenchido na detecção do marcador)
@@ -350,7 +350,7 @@ class FrontEnd(object):
 
                             # Move e pousa usando o ajuste final
                             try:
-                                self.tello.move_forward(self.ajuste_final)
+                                self.tello.move_forward(self.ajuste_final+2)
                             except Exception as e:
                                 print("Erro ao mover para frente:", e)
                             inis = True
@@ -638,7 +638,7 @@ class FrontEnd(object):
         elif key == pygame.K_t:  # takeoff
             self.tello.takeoff()
             self.send_rc_control = True
-            self.tello.rotate_clockwise(grau)
+            self.tello.rotate_counter_clockwise(grau)
             print("takeoff")
         elif key == pygame.K_l:  # land
             not self.tello.land()
